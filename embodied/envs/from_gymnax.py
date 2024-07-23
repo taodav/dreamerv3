@@ -131,7 +131,7 @@ class FromGymnax(embodied.Env):
       action = self._unflatten(action)
     else:
       action = action[self._act_key]
-    obs, reward, self._done, self._info = self._env.step(env_rng, self._state, action)
+    obs, self._state, reward, self._done, self._info = self._env.step(env_rng, self._state, action, self._env_params)
     return self._obs(
       obs, reward,
       is_last=bool(self._done),

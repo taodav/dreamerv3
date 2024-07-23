@@ -31,7 +31,7 @@ defaults:
     train_devices: [0]
     sync_every: 1
     profiler: False
-    transfer_guard: True
+    transfer_guard: False
     assert_num_devices: -1
     fetch_policy_carry: False
     nvidia_flags: False

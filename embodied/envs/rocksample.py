@@ -133,7 +133,7 @@ class RockSample(Environment):
         state, action, params, rand_key = check_inps
 
         rock_idx = action - 5
-        dist = jax.linalg.norm(state.position - self.rock_positions[rock_idx], ord=2, axis=-1)
+        dist = jnp.linalg.norm(state.position - self.rock_positions[rock_idx], ord=2, axis=-1)
         prob = half_dist_prob(dist, self.half_efficiency_distance)
 
         # w.p. prob we return correct rock observation.
