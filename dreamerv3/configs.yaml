@@ -84,6 +84,7 @@ defaults:
     dmc: {size: [64, 64], repeat: 2, image: True, camera: -1}
     procgen: {size: [64, 64]}
     loconav: {size: [64, 64], repeat: 2, camera: -1}
+    gymnax: {use_seed: True}
 
   # Agent
   report: True
@@ -259,6 +260,13 @@ loconav:
 
 memmaze:
   task: memmaze_11x11
+  enc.spaces: 'image'
+  dec.spaces: 'image'
+
+gymnax:
+  task: gymnax_rocksample_11_11
+  run:
+    steps: 5e6
   enc.spaces: 'image'
   dec.spaces: 'image'
 
