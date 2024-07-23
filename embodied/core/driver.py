@@ -8,11 +8,13 @@ from .. import distr
 
 class Driver:
 
-  def __init__(self, make_env_fns, parallel=True, **kwargs):
+  def __init__(self, make_env_fns, parallel=True,
+               vec_env=False, **kwargs):
     assert len(make_env_fns) >= 1
     self.parallel = parallel
     self.kwargs = kwargs
     self.length = len(make_env_fns)
+    self.vec_env = vec_env
     if parallel:
       import multiprocessing as mp
       context = mp.get_context()
@@ -23,6 +25,9 @@ class Driver:
           for i, (fn, pipe) in enumerate(zip(fns, pipes))]
       self.pipes[0].send(('act_space',))
       self.act_space = self._receive(self.pipes[0])
+    elif vec_env:
+      self.envs = make_env_fns()
+      self.act_space = self.envs.act_space
     else:
       self.envs = [fn() for fn in make_env_fns]
       self.act_space = self.envs[0].act_space
@@ -57,13 +62,16 @@ class Driver:
     assert all(len(x) == self.length for x in acts.values())
     assert all(isinstance(v, np.ndarray) for v in acts.values())
     acts = [{k: v[i] for k, v in acts.items()} for i in range(self.length)]
-    if self.parallel:
-      [pipe.send(('step', act)) for pipe, act in zip(self.pipes, acts)]
-      obs = [self._receive(pipe) for pipe in self.pipes]
+    if not self.vec_env:
+      if self.parallel:
+        [pipe.send(('step', act)) for pipe, act in zip(self.pipes, acts)]
+        obs = [self._receive(pipe) for pipe in self.pipes]
+      else:
+        obs = [env.step(act) for env, act in zip(self.envs, acts)]
+      obs = {k: np.stack([x[k] for x in obs]) for k in obs[0].keys()}
+      assert all(len(x) == self.length for x in obs.values()), obs
     else:
-      obs = [env.step(act) for env, act in zip(self.envs, acts)]
-    obs = {k: np.stack([x[k] for x in obs]) for k in obs[0].keys()}
-    assert all(len(x) == self.length for x in obs.values()), obs
+      obs = self.envs.step(acts)
     acts, outs, self.carry = policy(obs, self.carry, **self.kwargs)
     assert all(k not in acts for k in outs), (
         list(outs.keys()), list(acts.keys()))

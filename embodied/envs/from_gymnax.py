@@ -51,14 +51,13 @@ class FromGymnax(embodied.Env):
   def __init__(self, env, obs_key='image', act_key='action',
                seed: int = 2024, **kwargs):
 
-    with jax.default_device(jax.devices('cpu')[0]):
-      rng = jax.random.PRNGKey(seed)
-      self._rng, env_rng = jax.random.split(rng)
+    rng = jax.random.PRNGKey(seed)
+    self._rng, env_rng = jax.random.split(rng)
 
-      if isinstance(env, str):
-        self._env, self._env_params = get_gymnax_env(env, rand_key=env_rng)
-      else:
-        raise NotImplementedError
+    if isinstance(env, str):
+      self._env, self._env_params = get_gymnax_env(env, rand_key=env_rng)
+    else:
+      raise NotImplementedError
 
     self._state = None
     # TODO: spaces here?
@@ -124,17 +123,16 @@ class FromGymnax(embodied.Env):
     return spaces
 
   def step(self, action):
-    with jax.default_device(jax.devices('cpu')[0]):
-      self._rng, env_rng = jax.random.split(self._rng)
-      if action['reset'] or self._done:
-        self._done = False
-        obs, self._state = self._env.reset(env_rng, self._env_params)
-        return self._obs(obs, 0.0, is_first=True)
-      if self._act_dict:
-        action = self._unflatten(action)
-      else:
-        action = action[self._act_key]
-      obs, self._state, reward, self._done, self._info = self._env.step(env_rng, self._state, action, self._env_params)
+    self._rng, env_rng = jax.random.split(self._rng)
+    if action['reset'] or self._done:
+      self._done = False
+      obs, self._state = self._env.reset(env_rng, self._env_params)
+      return self._obs(obs, 0.0, is_first=True)
+    if self._act_dict:
+      action = self._unflatten(action)
+    else:
+      action = action[self._act_key]
+    obs, self._state, reward, self._done, self._info = self._env.step(env_rng, self._state, action, self._env_params)
     return self._obs(
       obs, reward,
       is_last=bool(self._done),
