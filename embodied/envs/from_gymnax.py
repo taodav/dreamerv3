@@ -149,3 +149,9 @@ class FromGymnax(embodied.Env):
       is_last=is_last,
       is_terminal=is_terminal)
     return obs
+
+  def close(self):
+    try:
+      self._env.close()
+    except Exception:
+      pass
