@@ -147,7 +147,7 @@ class PocMan(PacMan, Environment):
         # if we can see a ghost in each direction, obs[6:10]
         los_grid = self.line_sight_map[state.player_locations.x, state.player_locations.y]
         ghosts_grid = jnp.zeros_like(state.grid).at[state.ghost_locations[:, 1], state.ghost_locations[:, 0]].set(1)
-        any_in_dirs = (los_grid * ghosts_grid[None, ...]).sum(axis=-1).sum(axis=-1).astype(obs.dtype)
+        any_in_dirs = jnp.clip((los_grid * ghosts_grid[None, ...]).sum(axis=-1).sum(axis=-1).astype(obs.dtype), max=1)
         obs = obs.at[6:10].set(any_in_dirs)
 
         # If we have a powerpill, obs[10]
