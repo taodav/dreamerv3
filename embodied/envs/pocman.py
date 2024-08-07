@@ -153,7 +153,7 @@ class PocMan(PacMan, Environment):
         # If we have a powerpill, obs[10]
         obs = obs.at[10].set(state.frightened_state_time > 0)
 
-        return obs
+        return obs.astype(float)
 
 
     @partial(jax.jit, static_argnums=(0,))

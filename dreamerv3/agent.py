@@ -80,6 +80,16 @@ class Agent(nj.Module):
         self.config.slow_critic_update,
         name='updater')
 
+    if self.config.double_critic:
+        self.critic_1 = nets.MLP((), name='critic', **self.config.critic)
+        self.slowcritic_1 = nets.MLP(
+            (), name='slowcritic', **self.config.critic, dtype='float32')
+        self.updater_1 = jaxutils.SlowUpdater(
+            self.critic_1, self.slowcritic_1,
+            self.config.slow_critic_fraction,
+            self.config.slow_critic_update,
+            name='updater')
+
     # Optimizer
     kw = dict(config.opt)
     lr = kw.pop('lr')
@@ -89,6 +99,8 @@ class Agent(nj.Module):
     self.modules = [
         self.enc, self.dyn, self.dec, self.rew, self.con,
         self.actor, self.critic]
+    if hasattr(self, 'critic_1'):
+      self.modules.append(self.critic_1)
     scales = self.config.loss_scales.copy()
     cnn = scales.pop('dec_cnn')
     mlp = scales.pop('dec_mlp')
@@ -291,12 +303,21 @@ class Agent(nj.Module):
         'all': lambda x: x,
     }[self.config.ac_grads], outs)
     actor = self.actor(inp)
+    voffset, vscale = self.valnorm.stats()
+
     critic = self.critic(inp)
     slowcritic = self.slowcritic(inp)
-    voffset, vscale = self.valnorm.stats()
     val = critic.mean() * vscale + voffset
     slowval = slowcritic.mean() * vscale + voffset
     tarval = slowval if self.config.slowtar else val
+
+    if self.config.double_critic:
+      critic_1 = self.critic_1(inp)
+      slowcritic_1 = self.slowcritic_1(inp)
+      val_1 = critic_1.mean() * vscale + voffset
+      slowval_1 = slowcritic_1.mean() * vscale + voffset
+      tarval_1 = slowval_1 if self.config.slowtar else val_1
+
     discount = 1 if self.config.contdisc else 1 - 1 / self.config.horizon
     weight = jnp.cumprod(discount * con, 1) / discount
 
@@ -309,6 +330,14 @@ class Agent(nj.Module):
       rets.append(interm[:, t] + disc[:, t] * lam * rets[-1])
     ret = jnp.stack(list(reversed(rets))[:-1], 1)
 
+    if self.config.double_critic:
+      rets_1 = [tarval_1[:, -1]]
+      lam_1 = self.config.return_lambda_1
+      interm_1 = rew[:, 1:] + (1 - lam_1) * disc * tarval_1[:, 1:]
+      for t in reversed(range(disc.shape[1])):
+        rets_1.append(interm_1[:, t] + disc[:, t] * lam_1 * rets_1[-1])
+      ret_1 = jnp.stack(list(reversed(rets_1))[:-1], 1)
+
     # Actor
     roffset, rscale = self.retnorm(ret, update)
     adv = (ret - tarval[:, :-1]) / rscale
@@ -320,6 +349,7 @@ class Agent(nj.Module):
         logpi * sg(adv_normed) + self.config.actent * sum(ents.values()))
     losses['actor'] = actor_loss
 
+    # TODO: For LD, we need to repeat this loss for another value head.
     # Critic
     voffset, vscale = self.valnorm(ret, update)
     ret_normed = (ret - voffset) / vscale
@@ -350,6 +380,39 @@ class Agent(nj.Module):
           replay_critic.log_prob(sg(ret_padded)) +
           self.config.slowreg * replay_critic.log_prob(
               sg(replay_slowcritic.mean())))[:, :-1]
+
+    if self.config.double_critic:
+      voffset, vscale = self.valnorm(ret_1, update)
+      ret_normed_1 = (ret_1 - voffset) / vscale
+      ret_padded_1 = jnp.concatenate([ret_normed_1, 0 * ret_normed_1[:, -1:]], 1)
+      losses['critic_1'] = sg(weight)[:, :-1] * -(
+         critic_1.log_prob(sg(ret_padded_1)) +
+         self.config.slowreg * critic_1.log_prob(sg(slowcritic_1.mean())))[:, :-1]
+
+      # LD loss
+      losses['ld'] = ((critic.probs * critic_1.probs) ** 2).sum(axis=-1)
+
+      if self.config.replay_critic_loss:
+        replay_critic_1 = self.critic_1(
+          replay_outs if self.config.replay_critic_grad else sg(replay_outs))
+        replay_slowcritic_1 = self.slowcritic_1(replay_outs)
+        boot_1 = dict(
+          imag=ret[:, 0].reshape(data['reward'].shape),
+          critic=replay_critic_1.mean(),
+        )[self.config.replay_critic_bootstrap]
+        rets_1 = [boot_1[:, -1]]
+        for t in reversed(range(live.shape[1])):
+          rets_1.append(interm[:, t] + live[:, t] * cont[:, t] * rets_1[-1])
+        replay_ret_1 = jnp.stack(list(reversed(rets_1))[:-1], 1)
+        voffset_1, vscale_1 = self.valnorm(replay_ret_1, update)
+        ret_normed_1 = (replay_ret_1 - voffset_1) / vscale_1
+        ret_padded_1 = jnp.concatenate([ret_normed_1, 0 * ret_normed_1[:, -1:]], 1)
+        losses['replay_critic_1'] = sg(f32(~data['is_last']))[:, :-1] * -(
+          replay_critic_1.log_prob(sg(ret_padded_1)) +
+          self.config.slowreg * replay_critic_1.log_prob(
+            sg(replay_slowcritic_1.mean())))[:, :-1]
+
+      # we add our LD losses here
 
     # Metrics
     metrics.update({f'{k}_loss': v.mean() for k, v in losses.items()})

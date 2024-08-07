@@ -96,7 +96,7 @@ defaults:
   replay_length_eval: 0
   replay_context: 1
   random_agent: False
-  loss_scales: {dec_cnn: 1.0, dec_mlp: 1.0, reward: 1.0, cont: 1.0, dyn: 1.0, rep: 0.1, actor: 1.0, critic: 1.0, replay_critic: 0.3}
+  loss_scales: {dec_cnn: 1.0, dec_mlp: 1.0, reward: 1.0, cont: 1.0, dyn: 1.0, rep: 0.1, actor: 1.0, critic: 1.0, replay_critic: 0.3, critic_1: 1.0, replay_critic_1: 0.3, ld: 0.25}
   opt: {scaler: rms, lr: 4e-5, eps: 1e-20, momentum: True, wd: 0.0, warmup: 1000, globclip: 0.0, agc: 0.3, beta1: 0.9, beta2: 0.999, details: False, pmin: 1e-3, anneal: 0, schedule: constant}
   separate_lrs: False
   lrs: {dec: 1e-4, enc: 1e-4, dyn: 1e-4, rew: 1e-4, con: 1e-4, actor: 3e-5, critic: 3e-5}
@@ -136,7 +136,10 @@ defaults:
   imag_unroll: False
   horizon: 333
   return_lambda: 0.95
+  return_lambda_1: 0.1
   return_lambda_replay: 0.95
+  return_lambda_replay_1: 0.1
+  double_critic: False
   slow_critic_update: 1
   slow_critic_fraction: 0.02
   retnorm: {impl: perc, rate: 0.01, limit: 1.0, perclo: 5.0, perchi: 95.0}
