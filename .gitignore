@@ -7,3 +7,7 @@ MUJOCO_LOG.TXT
 
 dreamerv3/logs
 ;
+
+.idea/
+logs/
+venv/
