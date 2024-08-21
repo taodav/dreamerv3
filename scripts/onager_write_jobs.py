@@ -62,8 +62,6 @@ def generate_onager_runs(run_dicts: List[dict],
                     arg_string = f"+arg --{k} {' '.join(map(str, v))}"
                 arg_list.append(arg_string)
 
-        command += f" --study_name {experiment_name}"
-
         prelaunch_list.append(f'+command "{command}"')
         prelaunch_list.append(f'+tag --logdir')
 
@@ -84,7 +82,6 @@ def generate_onager_runs(run_dicts: List[dict],
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('hyperparam_file', type=str)
-    parser.add_argument('--study_name', default=None, type=str)
     parser.add_argument('--local', action='store_true')
     args = parser.parse_args()
 
@@ -100,7 +97,5 @@ if __name__ == "__main__":
         exclude = hparams['exclude']
 
     exp_name = hparam_path.stem
-    if args.study_name is not None:
-        exp_name = args.study_name
 
     generate_onager_runs(hparams['args'], exp_name, main_fname=main_fname, exclude=exclude)
