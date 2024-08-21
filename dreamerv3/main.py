@@ -33,7 +33,7 @@ def main(argv=None):
     config = config.update(agt.Agent.configs[name])
   config = embodied.Flags(config).parse(other)
   config = config.update(
-      logdir='logs/' + config.logdir.format(timestamp=embodied.timestamp()),
+      logdir='logs/' + (config.logdir + '{timestamp}').format(timestamp=embodied.timestamp()),
       replay_length=config.replay_length or config.batch_length,
       replay_length_eval=config.replay_length_eval or config.batch_length_eval)
   args = embodied.Config(
