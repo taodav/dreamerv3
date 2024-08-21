@@ -11,3 +11,4 @@ dreamerv3/logs
 .idea/
 logs/
 venv/
+.onager/
